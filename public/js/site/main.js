@@ -1,7 +1,7 @@
 import {
   api, formatBRL, html, maskPhoneInput, parseBRL, raw, render, storage, toast, whatsappLink, STATUS_LABEL,
 } from '../shared/util.js';
-import { cart } from './cart.js';
+import { cart, unitPrice } from './cart.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -32,7 +32,7 @@ async function loadMenu() {
   state.productsById.clear();
   for (const c of categories) {
     for (const p of c.products) {
-      state.productsById.set(p.id, p);
+      state.productsById.set(p.id, { ...p, addons: c.addons ?? [] });
       state.emojiByProduct.set(p.id, c.emoji);
     }
   }
@@ -161,12 +161,39 @@ function observeSections() {
 // ---------------------------------------------------------------- Detalhe do produto
 
 const productDialog = $('#product-dialog');
-let current = { product: null, qty: 1 };
+const MAX_ADDON_QTY = 5;
+let current = { product: null, qty: 1, addons: new Map() };
+
+function renderAddons(p) {
+  const box = $('#pd-addons');
+  box.hidden = p.addons.length === 0;
+  render(box, html`
+    <legend>Adicionais <small>opcional</small></legend>
+    <ul class="addon-list">
+      ${p.addons.map((a) => html`
+        <li class="addon-row" data-addon="${a.id}">
+          <span class="addon-name">${a.name}<small>+ ${formatBRL(a.price_cents)}</small></span>
+          <div class="qty small" role="group" aria-label="Quantidade de ${a.name}">
+            <button type="button" class="qty-btn" data-addon-step="-1" aria-label="Tirar ${a.name}">−</button>
+            <output>0</output>
+            <button type="button" class="qty-btn" data-addon-step="1" aria-label="Adicionar ${a.name}">+</button>
+          </div>
+        </li>`)}
+    </ul>`);
+}
+
+/** Adicionais escolhidos no diálogo, no formato do carrinho. */
+function selectedAddons() {
+  return current.product.addons
+    .filter((a) => current.addons.get(a.id) > 0)
+    .map((a) => ({ ...a, quantity: current.addons.get(a.id) }));
+}
 
 function openProduct(id) {
   const p = state.productsById.get(id);
   if (!p?.orderable) return;
-  current = { product: p, qty: 1 };
+  current = { product: p, qty: 1, addons: new Map() };
+  renderAddons(p);
   const emoji = state.emojiByProduct.get(id);
   render($('#pd-media'), p.image ? html`<img src="${p.image}" alt="">` : html`<div class="placeholder" aria-hidden="true">${emoji}</div>`);
   $('#pd-title').textContent = p.name;
@@ -182,7 +209,15 @@ function updateProductQty() {
   $('#pd-qty').textContent = qty;
   productDialog.querySelector('[data-qty="-1"]').disabled = qty <= 1;
   productDialog.querySelector('[data-qty="1"]').disabled = qty >= 50;
-  $('#pd-add').textContent = `Adicionar · ${formatBRL(product.price_cents * qty)}`;
+  productDialog.querySelectorAll('[data-addon]').forEach((row) => {
+    const n = current.addons.get(Number(row.dataset.addon)) ?? 0;
+    row.querySelector('output').textContent = n;
+    row.querySelector('[data-addon-step="-1"]').disabled = n === 0;
+    row.querySelector('[data-addon-step="1"]').disabled = n >= MAX_ADDON_QTY;
+    row.classList.toggle('selected', n > 0);
+  });
+  const unit = unitPrice({ price_cents: product.price_cents, addons: selectedAddons() });
+  $('#pd-add').textContent = `Adicionar · ${formatBRL(unit * qty)}`;
 }
 
 productDialog.addEventListener('click', (e) => {
@@ -191,12 +226,19 @@ productDialog.addEventListener('click', (e) => {
     current.qty = Math.max(1, Math.min(50, current.qty + Number(btn.dataset.qty)));
     updateProductQty();
   }
+  const addonBtn = e.target.closest('[data-addon-step]');
+  if (addonBtn) {
+    const id = Number(addonBtn.closest('[data-addon]').dataset.addon);
+    const next = (current.addons.get(id) ?? 0) + Number(addonBtn.dataset.addonStep);
+    current.addons.set(id, Math.max(0, Math.min(MAX_ADDON_QTY, next)));
+    updateProductQty();
+  }
   if (e.target.closest('[data-close]') || e.target === productDialog) productDialog.close();
 });
 
 $('#product-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  cart.add(current.product, current.qty, $('#pd-notes').value);
+  cart.add(current.product, current.qty, $('#pd-notes').value, selectedAddons());
   productDialog.close();
   toast(`${current.qty}× ${current.product.name} no carrinho`, 'success');
 });
@@ -252,12 +294,13 @@ function renderCartItems() {
     return;
   }
   render($('#cart-items'), html`
-    ${cart.hasUnavailable ? html`<p class="alert">Alguns itens esgotaram e não serão enviados. Remova-os para continuar.</p>` : ''}
+    ${cart.hasUnavailable ? html`<p class="alert">Alguns itens ou adicionais esgotaram e não serão enviados. Remova-os para continuar.</p>` : ''}
     <ul class="cart-list">
       ${cart.items.map((i) => html`
         <li class="cart-item ${i.unavailable ? 'unavailable' : ''}" data-item="${i.id}">
-          <span class="cart-item-name">${i.name}${i.unavailable ? ' (esgotado)' : ''}</span>
-          <span class="cart-item-price">${formatBRL(i.price_cents * i.quantity)}</span>
+          <span class="cart-item-name">${i.name}${i.unavailable ? ' (indisponível)' : ''}</span>
+          <span class="cart-item-price">${formatBRL(unitPrice(i) * i.quantity)}</span>
+          ${i.addons?.length ? html`<span class="cart-item-addons">${i.addons.map((a) => `+ ${a.quantity > 1 ? `${a.quantity}× ` : ''}${a.name}`).join(', ')}</span>` : ''}
           <label class="cart-item-notes">
             <span class="sr-only">Observação para ${i.name}</span>
             <input data-notes value="${i.notes}" maxlength="140" placeholder="+ adicionar observação">
@@ -440,7 +483,12 @@ function collectOrder() {
     notes: f.notes.value.trim(),
     items: cart.items
       .filter((i) => !i.unavailable)
-      .map((i) => ({ product_id: i.product_id, quantity: i.quantity, notes: i.notes })),
+      .map((i) => ({
+        product_id: i.product_id,
+        quantity: i.quantity,
+        notes: i.notes,
+        addons: (i.addons ?? []).map((a) => ({ addon_id: a.id, quantity: a.quantity })),
+      })),
   };
 }
 

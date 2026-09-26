@@ -8,6 +8,7 @@ acompanha tudo em tempo real num painel, com controle do cardápio e relatórios
 **Site do cliente** (`/`)
 - Cardápio por categoria (churrasquinhos, hambúrgueres, cachorros-quentes, bebidas…) com foto, descrição e preço.
 - Itens esgotados aparecem acinzentados; aviso de "últimas unidades" quando o estoque está baixo.
+- **Adicionais pagos** (bacon extra, cheddar, ovo…) escolhidos ao montar o lanche, com quantidade.
 - Carrinho com **observação por item** ("sem cebola", "bem passado") e **observação geral** do pedido.
 - Entrega ou retirada no food truck; **taxa de entrega por bairro**, pedido mínimo e entrega grátis acima de um valor.
 - Pagamento: Pix, dinheiro (com troco) ou cartão na maquininha.
@@ -19,8 +20,9 @@ acompanha tudo em tempo real num painel, com controle do cardápio e relatórios
 - **Pedidos em tempo real** com alerta sonoro, colunas Novos → Em preparo → Prontos/a caminho, impressão de comanda (bobina 80 mm) e atalho para falar com o cliente no WhatsApp.
 - Botão **Abrir/Fechar loja**.
 - **Cardápio**: criar/editar produtos e categorias, foto (reduzida automaticamente), preço, **custo**, interruptor de disponível/esgotado e **estoque opcional** (esgota sozinho ao zerar e volta ao cancelar pedido).
+- **Adicionais**: preço, custo, disponível/esgotado e em quais categorias aparecem (ex.: bacon em Hambúrgueres e Cachorros-quentes).
 - **Entrega**: bairros e taxas, pedido mínimo, entrega grátis, tempo estimado.
-- **Relatórios** por período: faturamento, número de pedidos, **lucro bruto e margem**, ticket médio, mais vendidos, pedidos por horário, formas de pagamento, entregas por bairro e **exportação para planilha (CSV/Excel)**.
+- **Relatórios** por período: faturamento, número de pedidos, **lucro bruto e margem**, ticket médio, mais vendidos, adicionais mais pedidos, pedidos por horário, formas de pagamento, entregas por bairro e **exportação para planilha (CSV/Excel)**.
 - Configurações da loja (nome, WhatsApp, Instagram, endereço, horário), Pix e troca de senha.
 
 ## Tecnologia

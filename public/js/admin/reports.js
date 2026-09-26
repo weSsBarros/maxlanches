@@ -181,6 +181,7 @@ function renderReport(r) {
       </div>
 
       <div class="report-grid two">
+        <div>
         <div class="card table-wrap">
           <h2>Mais vendidos</h2>
           <table class="history-table">
@@ -195,6 +196,16 @@ function renderReport(r) {
                 </tr>`)}
             </tbody>
           </table>
+        </div>
+        <div class="card table-wrap">
+          <h2>Adicionais</h2>
+          ${r.top_addons.length ? html`
+            <p class="card-sub">${formatBRL(s.addons_revenue_cents)} em adicionais · ${pct(s.addons_revenue_cents / s.products_revenue_cents)} das vendas de produtos</p>
+            <table class="history-table">
+              <thead><tr><th>Adicional</th><th class="num">Qtd.</th><th class="num">Vendas</th><th class="num">Lucro</th></tr></thead>
+              <tbody>${r.top_addons.map((a) => html`<tr><td>${a.name}</td><td class="num">${a.quantity}</td><td class="num">${formatBRL(a.revenue_cents)}</td><td class="num">${formatBRL(a.profit_cents)}</td></tr>`)}</tbody>
+            </table>` : html`<p class="card-sub">Nenhum adicional vendido no período.</p>`}
+        </div>
         </div>
         <div>
           <div class="card table-wrap">
@@ -215,7 +226,7 @@ function renderReport(r) {
           </div>
         </div>
       </div>
-      <p class="card-sub report-note">Lucro bruto = vendas de produtos − custo cadastrado de cada produto. Não inclui taxa de entrega,
+      <p class="card-sub report-note">Lucro bruto = vendas de produtos e adicionais − custo cadastrado de cada um. Não inclui taxa de entrega,
         gás, motoboy, taxas da maquininha e outras despesas fixas. Pedidos cancelados não entram em nenhum número.</p>
     `}`);
 

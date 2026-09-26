@@ -93,6 +93,36 @@ const migrations = [
     expires_at TEXT NOT NULL
   );
   `,
+  // 2 — Adicionais pagos (bacon extra, cheddar, ovo…), oferecidos por categoria.
+  `
+  CREATE TABLE addons (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL,
+    price_cents INTEGER NOT NULL CHECK (price_cents >= 0),
+    cost_cents  INTEGER NOT NULL DEFAULT 0 CHECK (cost_cents >= 0),
+    available   INTEGER NOT NULL DEFAULT 1,
+    sort_order  INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE addon_categories (
+    addon_id    INTEGER NOT NULL REFERENCES addons(id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (addon_id, category_id)
+  );
+  CREATE INDEX idx_addon_categories_category ON addon_categories(category_id);
+
+  -- Cópia do adicional no momento da venda (nome, preço e custo), por unidade do item.
+  CREATE TABLE order_item_addons (
+    id               INTEGER PRIMARY KEY,
+    order_item_id    INTEGER NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+    addon_id         INTEGER REFERENCES addons(id) ON DELETE SET NULL,
+    name             TEXT NOT NULL,
+    unit_price_cents INTEGER NOT NULL,
+    unit_cost_cents  INTEGER NOT NULL,
+    quantity         INTEGER NOT NULL CHECK (quantity > 0)
+  );
+  CREATE INDEX idx_order_item_addons_item ON order_item_addons(order_item_id);
+  `,
 ];
 
 export function openDatabase(file) {

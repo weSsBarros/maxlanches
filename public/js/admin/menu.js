@@ -5,6 +5,7 @@ let el;
 let ctx;
 let categories = [];
 let products = [];
+let addons = [];
 let search = '';
 let dirty = false;
 
@@ -15,13 +16,15 @@ export function mount(element, context) {
     <div class="panel-head">
       <h1>Cardápio</h1>
       <button class="btn btn-outline btn-sm" type="button" data-act="new-category">+ Categoria</button>
+      <button class="btn btn-outline btn-sm" type="button" data-act="new-addon">+ Adicional</button>
       <button class="btn btn-primary btn-sm" type="button" data-act="new-product">+ Produto</button>
     </div>
     <div class="menu-toolbar">
       <input class="input" type="search" id="menu-search" placeholder="Buscar produto…" aria-label="Buscar produto">
       <button class="btn btn-ghost btn-sm" type="button" data-act="all-available">Marcar tudo como disponível</button>
     </div>
-    <div id="menu-body"><p class="empty">Carregando…</p></div>`);
+    <div id="menu-body"><p class="empty">Carregando…</p></div>
+    <section class="cat-block addons-block" id="addons-body"></section>`);
   el.querySelector('#menu-search').addEventListener('input', (e) => {
     search = e.target.value.trim().toLowerCase();
     renderList();
@@ -42,11 +45,17 @@ export function onShow() {
 async function load() {
   dirty = false;
   try {
-    const [c, p] = await Promise.all([ctx.call('/api/admin/categories'), ctx.call('/api/admin/products')]);
+    const [c, p, a] = await Promise.all([
+      ctx.call('/api/admin/categories'),
+      ctx.call('/api/admin/products'),
+      ctx.call('/api/admin/addons'),
+    ]);
     categories = c.categories;
     products = p.products;
+    addons = a.addons;
     // Não redesenha enquanto o usuário edita um campo de estoque.
     if (!el.contains(document.activeElement) || !document.activeElement.matches('.stock-input')) renderList();
+    renderAddons();
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -101,11 +110,103 @@ function renderList() {
           <button class="btn btn-ghost btn-sm" type="button" data-act="toggle-category">${c.active ? 'Ocultar' : 'Mostrar'}</button>
           ${all.length === 0 ? html`<button class="btn btn-danger btn-sm" type="button" data-act="delete-category">Excluir</button>` : ''}
         </div>
+        ${categoryAddons(c.id).length ? html`<p class="cat-addons">Adicionais: ${categoryAddons(c.id).map((a) => a.name).join(', ')}</p>` : ''}
         <div class="prod-list">
           ${items.length ? items.map((p) => productRow(p, c)) : html`<p class="empty">Nenhum produto. <button class="btn btn-ghost btn-sm" type="button" data-act="new-product" data-cat="${c.id}">+ Adicionar</button></p>`}
         </div>
       </section>`;
   })}`);
+}
+
+const categoryAddons = (categoryId) => addons.filter((a) => a.category_ids.includes(categoryId));
+
+function renderAddons() {
+  const box = el.querySelector('#addons-body');
+  const catLabel = (id) => {
+    const c = categories.find((x) => x.id === id);
+    return c ? `${c.emoji} ${c.name}` : '';
+  };
+  render(box, html`
+    <div class="cat-head">
+      <h2>➕ Adicionais</h2>
+      <button class="btn btn-ghost btn-sm" type="button" data-act="new-addon">+ Novo adicional</button>
+    </div>
+    <p class="cat-addons">Extras pagos que o cliente escolhe ao montar o lanche (bacon, cheddar, ovo…). Cada adicional aparece nas categorias marcadas.</p>
+    <div class="prod-list">
+      ${addons.length ? addons.map((a) => {
+        const margin = a.price_cents ? Math.round(((a.price_cents - a.cost_cents) / a.price_cents) * 100) : 0;
+        return html`
+          <div class="prod-row ${a.available ? '' : 'off'}" data-addon="${a.id}">
+            <div class="prod-thumb" aria-hidden="true">➕</div>
+            <div>
+              <div class="prod-name">${a.name}</div>
+              <div class="prod-sub">
+                <span>+ ${formatBRL(a.price_cents)}</span>
+                ${a.cost_cents ? html`<span>lucro ${formatBRL(a.price_cents - a.cost_cents)} (${margin}%)</span>` : html`<span>sem custo cadastrado</span>`}
+                <span>${a.category_ids.length ? a.category_ids.map(catLabel).join(' · ') : html`<span class="badge badge-red">Em nenhuma categoria</span>`}</span>
+              </div>
+            </div>
+            <div class="prod-controls">
+              <label class="switch" title="Disponível para os clientes">
+                <input type="checkbox" data-addon-available ${a.available ? raw('checked') : ''} aria-label="${a.name} disponível">
+                <span class="track"></span>
+                <span class="avail-text" aria-hidden="true">${a.available ? 'Disponível' : 'Esgotado'}</span>
+              </label>
+              <button class="btn btn-outline btn-sm" type="button" data-act="edit-addon">Editar</button>
+            </div>
+          </div>`;
+      }) : html`<p class="empty">Nenhum adicional cadastrado.</p>`}
+    </div>`);
+}
+
+async function editAddon(addon) {
+  const values = await formDialog({
+    title: addon ? 'Editar adicional' : 'Novo adicional',
+    fields: [
+      { name: 'name', label: 'Nome', value: addon?.name ?? '', maxlength: 40, required: true, placeholder: 'Ex.: Bacon extra' },
+      { name: 'price', label: 'Preço (R$)', value: centsToInput(addon?.price_cents), inputmode: 'decimal', placeholder: '0,00', required: true, row: 'money' },
+      { name: 'cost', label: 'Custo (R$)', value: centsToInput(addon?.cost_cents), inputmode: 'decimal', placeholder: '0,00', row: 'money' },
+      {
+        name: 'category_ids',
+        label: 'Aparece em',
+        type: 'checkboxes',
+        options: categories.map((c) => ({
+          value: c.id,
+          label: `${c.emoji} ${c.name}`,
+          checked: addon ? addon.category_ids.includes(c.id) : false,
+        })),
+        hint: 'Todos os produtos das categorias marcadas oferecem este adicional.',
+      },
+      { name: 'available', label: 'Disponível', type: 'switch', value: addon ? addon.available : true },
+    ],
+    submitLabel: addon ? 'Salvar' : 'Criar',
+    secondaryLabel: addon ? 'Excluir' : undefined,
+    validate: (v) => {
+      if (parseBRL(v.price) === null) return 'Preço inválido. Use o formato 4,00.';
+      if (v.cost.trim() && parseBRL(v.cost) === null) return 'Custo inválido. Use o formato 1,50.';
+      if (!v.category_ids.length) return 'Marque ao menos uma categoria.';
+      return null;
+    },
+  });
+  if (!values) return;
+  if (values.action === 'secondary') {
+    if (await confirmDialog(`Excluir o adicional "${addon.name}"? Os pedidos antigos continuam nos relatórios.`, { title: 'Excluir adicional', confirmLabel: 'Excluir' })) {
+      await ctx.call(`/api/admin/addons/${addon.id}`, { method: 'DELETE' });
+      toast('Adicional excluído.');
+      load();
+    }
+    return;
+  }
+  const body = {
+    name: values.name.trim(),
+    price_cents: parseBRL(values.price),
+    cost_cents: values.cost.trim() ? parseBRL(values.cost) : 0,
+    category_ids: values.category_ids.map(Number),
+    available: values.available,
+  };
+  await ctx.call(addon ? `/api/admin/addons/${addon.id}` : '/api/admin/addons', { method: addon ? 'PATCH' : 'POST', body });
+  toast('Adicional salvo!', 'success');
+  load();
 }
 
 async function patchProduct(id, body) {
@@ -115,6 +216,19 @@ async function patchProduct(id, body) {
 }
 
 async function onChange(e) {
+  const addonRow = e.target.closest('[data-addon]');
+  if (addonRow && e.target.matches('[data-addon-available]')) {
+    try {
+      const a = await ctx.call(`/api/admin/addons/${addonRow.dataset.addon}`, { method: 'PATCH', body: { available: e.target.checked } });
+      addons = addons.map((x) => (x.id === a.id ? a : x));
+      toast(a.available ? `${a.name} disponível` : `${a.name} marcado como esgotado`);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+    renderAddons();
+    renderList();
+    return;
+  }
   const row = e.target.closest('[data-product]');
   if (!row) return;
   const id = Number(row.dataset.product);
@@ -177,6 +291,13 @@ async function onClick(e) {
         break;
       case 'new-category':
         await editCategory(null);
+        break;
+      case 'new-addon':
+        if (!categories.length) return toast('Crie uma categoria primeiro.', 'error');
+        await editAddon(null);
+        break;
+      case 'edit-addon':
+        await editAddon(addons.find((a) => a.id === Number(btn.closest('[data-addon]').dataset.addon)));
         break;
       case 'edit-category':
         await editCategory(cat);

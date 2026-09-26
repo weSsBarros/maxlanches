@@ -26,9 +26,15 @@ function productRow(p) {
 export function getPublicMenu(db) {
   const categories = db.prepare('SELECT id, name, emoji FROM categories WHERE active = 1 ORDER BY sort_order, id').all();
   const products = db.prepare('SELECT * FROM products ORDER BY sort_order, id').all();
+  const addons = db
+    .prepare(`SELECT a.id, a.name, a.price_cents, ac.category_id FROM addons a
+              JOIN addon_categories ac ON ac.addon_id = a.id
+              WHERE a.available = 1 ORDER BY a.sort_order, a.id`)
+    .all();
   return categories
     .map((c) => ({
       ...c,
+      addons: addons.filter((a) => a.category_id === c.id).map(({ id, name, price_cents }) => ({ id, name, price_cents })),
       products: products
         .filter((p) => p.category_id === c.id)
         .map((p) => ({
@@ -200,4 +206,86 @@ export function updateZone(db, id, input) {
 export function deleteZone(db, id) {
   const { changes } = db.prepare('DELETE FROM delivery_zones WHERE id = ?').run(id);
   if (!changes) throw new HttpError(404, 'Bairro não encontrado.');
+}
+
+// ---------- Adicionais ----------
+
+export function listAddons(db) {
+  const links = new Map();
+  for (const r of db.prepare('SELECT addon_id, category_id FROM addon_categories ORDER BY category_id').all()) {
+    if (!links.has(r.addon_id)) links.set(r.addon_id, []);
+    links.get(r.addon_id).push(r.category_id);
+  }
+  return db
+    .prepare('SELECT * FROM addons ORDER BY sort_order, id')
+    .all()
+    .map((a) => ({ ...a, available: Boolean(a.available), category_ids: links.get(a.id) ?? [] }));
+}
+
+function getAddon(db, id) {
+  const addon = listAddons(db).find((a) => a.id === id);
+  if (!addon) throw new HttpError(404, 'Adicional não encontrado.');
+  return addon;
+}
+
+function validateAddon(db, input, partial) {
+  const v = new Validator(input)
+    .string('name', 'Nome', { required: !partial, max: 40 })
+    .int('price_cents', 'Preço', { required: !partial, min: 0, max: MAX_PRICE })
+    .int('cost_cents', 'Custo', { min: 0, max: MAX_PRICE })
+    .bool('available', 'Disponível')
+    .int('sort_order', 'Ordem', { min: 0, max: 9999 });
+  if (input && 'category_ids' in input) {
+    const ids = input.category_ids;
+    if (!Array.isArray(ids) || ids.length > 50 || !ids.every((id) => Number.isInteger(id) && id > 0)) {
+      v.errors.push('Categorias inválidas.');
+    } else {
+      const unique = [...new Set(ids)];
+      const found = unique.length
+        ? db.prepare(`SELECT COUNT(*) AS n FROM categories WHERE id IN (${unique.map(() => '?').join(',')})`).get(...unique).n
+        : 0;
+      if (found !== unique.length) v.errors.push('Categoria não existe.');
+      else v.out.category_ids = unique;
+    }
+  }
+  if (!v.ok) throw new HttpError(400, v.errors.join(' '), v.errors);
+  if (partial) for (const k of Object.keys(v.out)) if (!(k in input)) delete v.out[k];
+  return v.out;
+}
+
+function setAddonCategories(db, addonId, categoryIds) {
+  db.prepare('DELETE FROM addon_categories WHERE addon_id = ?').run(addonId);
+  const link = db.prepare('INSERT INTO addon_categories (addon_id, category_id) VALUES (?, ?)');
+  for (const id of categoryIds) link.run(addonId, id);
+}
+
+export function createAddon(db, input) {
+  const d = validateAddon(db, input, false);
+  const id = db.transaction(() => {
+    const nextOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM addons').get().n;
+    const { lastInsertRowid } = db
+      .prepare('INSERT INTO addons (name, price_cents, cost_cents, available, sort_order) VALUES (?, ?, ?, ?, ?)')
+      .run(d.name, d.price_cents, d.cost_cents ?? 0, d.available === false ? 0 : 1, d.sort_order ?? nextOrder);
+    setAddonCategories(db, Number(lastInsertRowid), d.category_ids ?? []);
+    return Number(lastInsertRowid);
+  })();
+  return getAddon(db, id);
+}
+
+export function updateAddon(db, id, input) {
+  const d = validateAddon(db, input, true);
+  const current = db.prepare('SELECT * FROM addons WHERE id = ?').get(id);
+  if (!current) throw new HttpError(404, 'Adicional não encontrado.');
+  const n = { ...current, ...d };
+  db.transaction(() => {
+    db.prepare('UPDATE addons SET name = ?, price_cents = ?, cost_cents = ?, available = ?, sort_order = ? WHERE id = ?')
+      .run(n.name, n.price_cents, n.cost_cents, n.available ? 1 : 0, n.sort_order, id);
+    if (d.category_ids) setAddonCategories(db, id, d.category_ids);
+  })();
+  return getAddon(db, id);
+}
+
+export function deleteAddon(db, id) {
+  const { changes } = db.prepare('DELETE FROM addons WHERE id = ?').run(id);
+  if (!changes) throw new HttpError(404, 'Adicional não encontrado.');
 }

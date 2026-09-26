@@ -83,6 +83,25 @@ export function buildReport(db, query, timeZone) {
     }
   }
 
+  const addons = new Map();
+  if (validIds.size) {
+    const rows = db
+      .prepare(`SELECT a.name, a.unit_price_cents, a.unit_cost_cents, a.quantity * oi.quantity AS units
+                FROM order_item_addons a
+                JOIN order_items oi ON oi.id = a.order_item_id
+                JOIN orders o ON o.id = oi.order_id
+                WHERE o.created_at >= ? AND o.created_at < ? AND o.status != 'cancelado'`)
+      .all(range.startUtc, range.endUtc);
+    for (const r of rows) {
+      const a = addons.get(r.name) ?? { name: r.name, quantity: 0, revenue_cents: 0, profit_cents: 0 };
+      a.quantity += r.units;
+      a.revenue_cents += r.unit_price_cents * r.units;
+      a.profit_cents += (r.unit_price_cents - r.unit_cost_cents) * r.units;
+      addons.set(r.name, a);
+    }
+  }
+  const addonsRevenue = [...addons.values()].reduce((n, a) => n + a.revenue_cents, 0);
+
   return {
     range: { from: range.from, to: range.to, days: range.days },
     summary: {
@@ -96,6 +115,7 @@ export function buildReport(db, query, timeZone) {
       delivery_fees_cents: deliveryFees,
       avg_ticket_cents: valid.length ? Math.round(revenue / valid.length) : 0,
       items_sold: [...products.values()].reduce((acc, p) => acc + p.quantity, 0),
+      addons_revenue_cents: addonsRevenue,
     },
     by_day: [...byDay.values()],
     by_hour: byHour,
@@ -103,6 +123,7 @@ export function buildReport(db, query, timeZone) {
     by_fulfillment: byFulfillment,
     by_zone: [...byZone.values()].sort((a, b) => b.orders - a.orders),
     top_products: [...products.values()].sort((a, b) => b.quantity - a.quantity || b.revenue_cents - a.revenue_cents),
+    top_addons: [...addons.values()].sort((a, b) => b.quantity - a.quantity || b.revenue_cents - a.revenue_cents),
   };
 }
 
@@ -118,7 +139,12 @@ export function buildOrdersCsv(db, query, timeZone) {
   const orders = db
     .prepare('SELECT * FROM orders WHERE created_at >= ? AND created_at < ? ORDER BY created_at')
     .all(range.startUtc, range.endUtc);
-  const itemsStmt = db.prepare('SELECT product_name, quantity, notes FROM order_items WHERE order_id = ? ORDER BY id');
+  const itemsStmt = db.prepare('SELECT id, product_name, quantity, notes FROM order_items WHERE order_id = ? ORDER BY id');
+  const addonsStmt = db.prepare('SELECT name, quantity FROM order_item_addons WHERE order_item_id = ? ORDER BY id');
+  const describeItem = (i) => {
+    const addons = addonsStmt.all(i.id).map((a) => `+${a.quantity > 1 ? `${a.quantity}x ` : ''}${a.name}`);
+    return `${i.quantity}x ${i.product_name}${addons.length ? ` [${addons.join(', ')}]` : ''}${i.notes ? ` (${i.notes})` : ''}`;
+  };
   const money = (c) => (c / 100).toFixed(2).replace('.', ',');
   const cell = (v) => {
     const s = String(v ?? '');
@@ -130,7 +156,7 @@ export function buildOrdersCsv(db, query, timeZone) {
     'Produtos (R$)', 'Taxa entrega (R$)', 'Total (R$)', 'Custo (R$)', 'Lucro bruto (R$)'];
   const lines = [header.join(';')];
   for (const o of orders) {
-    const items = itemsStmt.all(o.id).map((i) => `${i.quantity}x ${i.product_name}${i.notes ? ` (${i.notes})` : ''}`).join(' | ');
+    const items = itemsStmt.all(o.id).map(describeItem).join(' | ');
     lines.push([
       o.id, dateFmt.format(new Date(o.created_at)), STATUS_LABEL[o.status], o.customer_name, o.customer_phone,
       o.fulfillment === 'entrega' ? 'Entrega' : 'Retirada', o.zone_name, PAYMENT_LABEL[o.payment_method], items,

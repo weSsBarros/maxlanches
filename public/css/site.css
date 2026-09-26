@@ -650,3 +650,67 @@
   grid-column: 1 / -1;
   font-size: 14px;
 }
+
+/* ---------- Adicionais ---------- */
+.pd-addons {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.pd-addons legend {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 900;
+}
+.pd-addons legend small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+.addon-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.addon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.15s;
+}
+.addon-row:last-child {
+  border-bottom: 0;
+}
+.addon-row.selected {
+  background: var(--mustard-soft);
+}
+.addon-name {
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.addon-name small {
+  color: var(--muted);
+  font-weight: 700;
+}
+.cart-item-addons {
+  grid-column: 1 / -1;
+  margin-top: -4px;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 700;
+}

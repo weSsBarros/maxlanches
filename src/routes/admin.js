@@ -121,6 +121,23 @@ export function adminRoutes({ db, events, config }) {
     res.status(204).end();
   });
 
+  r.get('/addons', (_req, res) => res.json({ addons: catalog.listAddons(db) }));
+  r.post('/addons', (req, res) => {
+    const a = catalog.createAddon(db, req.body);
+    menuChanged();
+    res.status(201).json(a);
+  });
+  r.patch('/addons/:id', (req, res) => {
+    const a = catalog.updateAddon(db, idParam(req), req.body);
+    menuChanged();
+    res.json(a);
+  });
+  r.delete('/addons/:id', (req, res) => {
+    catalog.deleteAddon(db, idParam(req));
+    menuChanged();
+    res.status(204).end();
+  });
+
   fs.mkdirSync(config.uploadsDir, { recursive: true });
   const upload = multer({
     storage: multer.diskStorage({

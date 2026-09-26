@@ -22,6 +22,8 @@ const NEXT = {
 };
 const PREV = { preparo: 'novo', entrega: 'preparo', pronto: 'preparo' };
 
+const addonText = (a) => `+ ${a.quantity > 1 ? `${a.quantity}× ` : ''}${a.name}`;
+
 export function mount(element, context) {
   el = element;
   ctx = context;
@@ -118,6 +120,7 @@ function orderCard(o) {
       <ul class="order-items">
         ${o.items.map((i) => html`
           <li><span class="qty-tag">${i.quantity}×</span>${i.product_name}
+            ${i.addons.map((a) => html`<span class="addon-tag">${addonText(a)}</span>`)}
             ${i.notes ? html`<span class="obs">⚠ ${i.notes}</span>` : ''}</li>`)}
       </ul>
       ${o.notes ? html`<p class="order-notes">📝 ${o.notes}</p>` : ''}
@@ -247,7 +250,7 @@ function renderHistory(list) {
             <td><strong>${o.id}</strong></td>
             <td>${timeOf(o.created_at)}</td>
             <td>${o.customer_name}<br><small class="muted">${o.fulfillment === 'entrega' ? o.zone_name : 'Retirada'}</small></td>
-            <td><small>${o.items.map((i) => `${i.quantity}× ${i.product_name}`).join(', ')}</small></td>
+            <td><small>${o.items.map((i) => `${i.quantity}× ${i.product_name}${i.addons.length ? ` (${i.addons.map(addonText).join(', ')})` : ''}`).join('; ')}</small></td>
             <td>${PAYMENT_LABEL[o.payment_method]}</td>
             <td class="num">${formatBRL(o.total_cents)}</td>
             <td><span class="badge ${o.status === 'cancelado' ? 'badge-red' : o.status === 'concluido' ? 'badge-ok' : ''}">${STATUS_LABEL[o.status]}</span>
@@ -273,7 +276,8 @@ function printOrder(o) {
     ${o.fulfillment === 'entrega' ? html`<p>${o.address}${o.address_reference ? html`<br>${o.address_reference}` : ''}<br>Bairro: ${o.zone_name}</p>` : ''}
     <hr>
     ${o.items.map((i) => html`
-      <div class="row"><span>${i.quantity}x ${i.product_name}</span><span>${formatBRL(i.unit_price_cents * i.quantity)}</span></div>
+      <div class="row"><span>${i.quantity}x ${i.product_name}</span><span>${formatBRL(i.line_total_cents)}</span></div>
+      ${i.addons.map((a) => html`<p class="big">   ${addonText(a)}</p>`)}
       ${i.notes ? html`<p>  &gt;&gt; ${i.notes}</p>` : ''}`)}
     ${o.notes ? html`<hr><p>OBS: ${o.notes}</p>` : ''}
     <hr>

@@ -808,3 +808,42 @@ body {
 .report-note {
   margin: 16px 0 0;
 }
+.addon-tag {
+  display: block;
+  margin: 2px 0 0 28px;
+  color: var(--red-dark);
+  font-size: 15px;
+  font-weight: 900;
+}
+.check-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.check-group legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--red);
+}
+.cat-addons {
+  margin: -2px 0 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+.addons-block {
+  margin-top: 28px;
+}

@@ -19,7 +19,14 @@ seedDemoData(db);
 updateSettings(db, { is_open: true });
 
 const names = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elaine', 'Felipe', 'Gabi', 'Hugo', 'Iara', 'João', 'Karina', 'Lucas'];
-const products = db.prepare('SELECT id FROM products').all().map((p) => p.id);
+const productRows = db.prepare('SELECT id, category_id FROM products').all();
+const products = productRows.map((p) => p.id);
+const categoryOf = new Map(productRows.map((p) => [p.id, p.category_id]));
+const addonsByCategory = new Map();
+for (const r of db.prepare('SELECT addon_id, category_id FROM addon_categories').all()) {
+  if (!addonsByCategory.has(r.category_id)) addonsByCategory.set(r.category_id, []);
+  addonsByCategory.get(r.category_id).push(r.addon_id);
+}
 const zones = db.prepare('SELECT id FROM delivery_zones WHERE active = 1').all().map((z) => z.id);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const setDate = db.prepare('UPDATE orders SET created_at = ?, updated_at = ?, status = ? WHERE id = ?');
@@ -30,10 +37,14 @@ for (let d = days - 1; d >= 0; d--) {
   if (weekday === 1) continue; // segunda: food truck fechado
   const ordersToday = 6 + Math.floor(Math.random() * (weekday === 5 || weekday === 6 ? 22 : 12));
   for (let n = 0; n < ordersToday; n++) {
-    const items = Array.from({ length: 1 + Math.floor(Math.random() * 3) }, () => ({
-      product_id: pick(products),
-      quantity: 1 + Math.floor(Math.random() * 3),
-    }));
+    const items = Array.from({ length: 1 + Math.floor(Math.random() * 3) }, () => {
+      const product_id = pick(products);
+      const options = addonsByCategory.get(categoryOf.get(product_id)) ?? [];
+      const addons = options.length && Math.random() < 0.4
+        ? [...new Set([pick(options), pick(options)])].map((addon_id) => ({ addon_id, quantity: 1 }))
+        : [];
+      return { product_id, quantity: 1 + Math.floor(Math.random() * 3), addons };
+    });
     const delivery = Math.random() < 0.6 && zones.length;
     const order = createOrder(db, {
       customer_name: pick(names),

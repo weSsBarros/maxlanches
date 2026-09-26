@@ -10,6 +10,8 @@ export const ACTIVE_STATUSES = ['novo', 'preparo', 'entrega', 'pronto'];
 
 const MAX_ITEMS = 50;
 const MAX_QTY = 50;
+const MAX_ADDONS_PER_ITEM = 10;
+const MAX_ADDON_QTY = 5;
 const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 function randomCode(length = 10) {
@@ -54,12 +56,35 @@ function validateOrderInput(input, settings) {
       .int('product_id', 'Produto', { required: true, min: 1 })
       .int('quantity', 'Quantidade', { required: true, min: 1, max: MAX_QTY })
       .string('notes', 'Observação do item', { max: 140 });
+    const addons = validateItemAddons(item?.addons, iv.errors);
     if (!iv.ok) v.errors.push(...iv.errors);
-    else cleanItems.push(iv.out);
+    else cleanItems.push({ ...iv.out, addons });
   }
 
   if (!v.ok) throw new HttpError(400, v.errors[0], v.errors);
   return { ...v.out, items: cleanItems };
+}
+
+/** Adicionais de um item: [{ addon_id, quantity }]. Repetidos são somados. */
+function validateItemAddons(raw, errors) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > MAX_ADDONS_PER_ITEM) {
+    errors.push('Adicionais inválidos.');
+    return [];
+  }
+  const byId = new Map();
+  for (const a of raw) {
+    const av = new Validator(a)
+      .int('addon_id', 'Adicional', { required: true, min: 1 })
+      .int('quantity', 'Quantidade do adicional', { required: true, min: 1, max: MAX_ADDON_QTY });
+    if (!av.ok) {
+      errors.push(...av.errors);
+      continue;
+    }
+    byId.set(av.out.addon_id, (byId.get(av.out.addon_id) ?? 0) + av.out.quantity);
+  }
+  if ([...byId.values()].some((q) => q > MAX_ADDON_QTY)) errors.push(`Máximo de ${MAX_ADDON_QTY} unidades de cada adicional.`);
+  return [...byId].map(([addon_id, quantity]) => ({ addon_id, quantity }));
 }
 
 /**
@@ -89,12 +114,28 @@ export function createOrder(db, rawInput) {
       }
     }
 
+    // Adicionais: precisam estar disponíveis e liberados para a categoria do produto.
+    const getAddon = db.prepare(`
+      SELECT a.* FROM addons a JOIN addon_categories ac ON ac.addon_id = a.id
+      WHERE a.id = ? AND ac.category_id = ?`);
+    for (const item of input.items) {
+      const p = products.get(item.product_id);
+      item.resolvedAddons = item.addons.map(({ addon_id, quantity }) => {
+        const addon = getAddon.get(addon_id, p.category_id);
+        if (!addon) throw new HttpError(409, `Um adicional escolhido para "${p.name}" não está mais disponível. Revise o item.`);
+        if (!addon.available) throw new HttpError(409, `O adicional "${addon.name}" acabou. Remova-o de "${p.name}" para continuar.`);
+        return { addon, quantity };
+      });
+    }
+
     let subtotal = 0;
     let cost = 0;
     for (const item of input.items) {
       const p = products.get(item.product_id);
-      subtotal += p.price_cents * item.quantity;
-      cost += p.cost_cents * item.quantity;
+      const addonsPrice = item.resolvedAddons.reduce((n, a) => n + a.addon.price_cents * a.quantity, 0);
+      const addonsCost = item.resolvedAddons.reduce((n, a) => n + a.addon.cost_cents * a.quantity, 0);
+      subtotal += (p.price_cents + addonsPrice) * item.quantity;
+      cost += (p.cost_cents + addonsCost) * item.quantity;
     }
 
     if (settings.min_order_cents > 0 && subtotal < settings.min_order_cents) {
@@ -154,9 +195,15 @@ export function createOrder(db, rawInput) {
     const insertItem = db.prepare(`
       INSERT INTO order_items (order_id, product_id, product_name, unit_price_cents, unit_cost_cents, quantity, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    const insertItemAddon = db.prepare(`
+      INSERT INTO order_item_addons (order_item_id, addon_id, name, unit_price_cents, unit_cost_cents, quantity)
+      VALUES (?, ?, ?, ?, ?, ?)`);
     for (const item of input.items) {
       const p = products.get(item.product_id);
-      insertItem.run(orderId, p.id, p.name, p.price_cents, p.cost_cents, item.quantity, item.notes ?? '');
+      const itemId = insertItem.run(orderId, p.id, p.name, p.price_cents, p.cost_cents, item.quantity, item.notes ?? '').lastInsertRowid;
+      for (const { addon, quantity } of item.resolvedAddons) {
+        insertItemAddon.run(itemId, addon.id, addon.name, addon.price_cents, addon.cost_cents, quantity);
+      }
     }
     const decrement = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ? AND stock IS NOT NULL');
     for (const [id, qty] of qtyByProduct) decrement.run(qty, id);
@@ -177,8 +224,23 @@ function hydrate(db, orders) {
   const items = db
     .prepare(`SELECT * FROM order_items WHERE order_id IN (${ids.map(() => '?').join(',')}) ORDER BY id`)
     .all(...ids);
+  const addonsByItem = new Map();
+  if (items.length) {
+    const itemIds = items.map((it) => it.id);
+    const addons = db
+      .prepare(`SELECT * FROM order_item_addons WHERE order_item_id IN (${itemIds.map(() => '?').join(',')}) ORDER BY id`)
+      .all(...itemIds);
+    for (const a of addons) {
+      if (!addonsByItem.has(a.order_item_id)) addonsByItem.set(a.order_item_id, []);
+      addonsByItem.get(a.order_item_id).push(a);
+    }
+  }
   const byOrder = new Map(ids.map((id) => [id, []]));
-  for (const it of items) byOrder.get(it.order_id).push(it);
+  for (const it of items) {
+    const addons = addonsByItem.get(it.id) ?? [];
+    const addonsPrice = addons.reduce((n, a) => n + a.unit_price_cents * a.quantity, 0);
+    byOrder.get(it.order_id).push({ ...it, addons, line_total_cents: (it.unit_price_cents + addonsPrice) * it.quantity });
+  }
   return orders.map((o) => ({ ...o, items: byOrder.get(o.id) }));
 }
 
@@ -230,7 +292,9 @@ export function getPublicOrder(db, code) {
       name: i.product_name,
       quantity: i.quantity,
       unit_price_cents: i.unit_price_cents,
+      line_total_cents: i.line_total_cents,
       notes: i.notes,
+      addons: i.addons.map((a) => ({ name: a.name, quantity: a.quantity, unit_price_cents: a.unit_price_cents })),
     })),
     pix,
   };

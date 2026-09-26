@@ -42,6 +42,16 @@ const DEMO_ZONES = [
   ['Parque Industrial', 900],
 ];
 
+// [nome, preço, custo, categorias onde aparece]
+const DEMO_ADDONS = [
+  ['Bacon extra', 400, 180, ['Hambúrgueres', 'Cachorros-quentes']],
+  ['Cheddar', 300, 120, ['Hambúrgueres', 'Cachorros-quentes']],
+  ['Ovo', 200, 70, ['Hambúrgueres']],
+  ['Hambúrguer extra 120g', 700, 300, ['Hambúrgueres']],
+  ['Salsicha extra', 300, 110, ['Cachorros-quentes']],
+  ['Catupiry', 300, 130, ['Hambúrgueres', 'Cachorros-quentes']],
+];
+
 export function seedDemoData(db) {
   const hasData = db.prepare('SELECT COUNT(*) AS n FROM categories').get().n > 0;
   if (hasData) return false;
@@ -51,15 +61,23 @@ export function seedDemoData(db) {
     INSERT INTO products (category_id, name, description, price_cents, cost_cents, sort_order)
     VALUES (?, ?, ?, ?, ?, ?)`);
   const insertZone = db.prepare('INSERT INTO delivery_zones (name, fee_cents, sort_order) VALUES (?, ?, ?)');
+  const insertAddon = db.prepare('INSERT INTO addons (name, price_cents, cost_cents, sort_order) VALUES (?, ?, ?, ?)');
+  const linkAddon = db.prepare('INSERT INTO addon_categories (addon_id, category_id) VALUES (?, ?)');
 
   db.transaction(() => {
+    const categoryIds = new Map();
     DEMO_MENU.forEach((cat, ci) => {
       const { lastInsertRowid } = insertCategory.run(cat.name, cat.emoji, ci);
+      categoryIds.set(cat.name, lastInsertRowid);
       cat.products.forEach(([name, desc, price, cost], pi) => {
         insertProduct.run(lastInsertRowid, name, desc, price, cost, pi);
       });
     });
     DEMO_ZONES.forEach(([name, fee], i) => insertZone.run(name, fee, i));
+    DEMO_ADDONS.forEach(([name, price, cost, categories], i) => {
+      const { lastInsertRowid } = insertAddon.run(name, price, cost, i);
+      categories.forEach((c) => linkAddon.run(lastInsertRowid, categoryIds.get(c)));
+    });
   })();
   return true;
 }

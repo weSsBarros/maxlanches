@@ -20,7 +20,10 @@ function whatsappMessage(order) {
   const lines = [
     `*Pedido #${order.number}* — ${store?.store_name ?? 'Max Lanches'}`,
     '',
-    ...order.items.map((i) => `${i.quantity}x ${i.name} — ${formatBRL(i.unit_price_cents * i.quantity)}${i.notes ? `\n   _Obs.: ${i.notes}_` : ''}`),
+    ...order.items.map((i) => {
+      const addons = i.addons.map((a) => `\n   + ${a.quantity > 1 ? `${a.quantity}x ` : ''}${a.name}`).join('');
+      return `${i.quantity}x ${i.name} — ${formatBRL(i.line_total_cents)}${addons}${i.notes ? `\n   _Obs.: ${i.notes}_` : ''}`;
+    }),
     '',
     `Subtotal: ${formatBRL(order.subtotal_cents)}`,
   ];
@@ -90,8 +93,10 @@ function renderOrder(order) {
       <ul class="summary-items">
         ${order.items.map((i) => html`
           <li>
-            <span><strong>${i.quantity}×</strong> ${i.name}${i.notes ? html`<small>Obs.: ${i.notes}</small>` : ''}</span>
-            <span>${formatBRL(i.unit_price_cents * i.quantity)}</span>
+            <span><strong>${i.quantity}×</strong> ${i.name}
+              ${i.addons.map((a) => html`<small class="addon-line">+ ${a.quantity > 1 ? `${a.quantity}× ` : ''}${a.name}</small>`)}
+              ${i.notes ? html`<small>Obs.: ${i.notes}</small>` : ''}</span>
+            <span>${formatBRL(i.line_total_cents)}</span>
           </li>`)}
       </ul>
       <dl class="totals">
