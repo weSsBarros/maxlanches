@@ -1,0 +1,8 @@
+# Troque pelo domínio da loja.
+maxlanches.com.br, www.maxlanches.com.br {
+	encode gzip
+	reverse_proxy app:3000 {
+		# Mantém a conexão de pedidos em tempo real (SSE) aberta.
+		flush_interval -1
+	}
+}

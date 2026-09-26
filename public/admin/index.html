@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Painel — Max Lanches</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#1F1A17">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/admin/manifest.webmanifest">
+  <link rel="preload" href="/fonts/nunito-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script type="module" src="/js/admin/main.js"></script>
+</head>
+<body>
+  <!-- Login -->
+  <main class="login" id="login-view" hidden>
+    <form class="login-card form-grid" id="login-form">
+      <div class="login-brand">
+        <span class="logo-mark" aria-hidden="true">M</span>
+        <div><strong>Max Lanches</strong><small>Painel do lojista</small></div>
+      </div>
+      <label class="field"><span>Usuário</span><input name="username" autocomplete="username" required value="admin"></label>
+      <label class="field"><span>Senha</span><input name="password" type="password" autocomplete="current-password" required></label>
+      <p class="alert" id="login-error" role="alert" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit">Entrar</button>
+      <a class="muted login-back" href="/">← Voltar ao site</a>
+    </form>
+  </main>
+
+  <!-- Aplicação -->
+  <div class="app" id="app-view" hidden>
+    <header class="admin-top">
+      <div class="admin-top-inner">
+        <a class="admin-brand" href="/admin/"><span class="logo-mark" aria-hidden="true">M</span><span>Painel</span></a>
+        <label class="switch store-switch" title="Abrir ou fechar a loja para novos pedidos">
+          <input type="checkbox" id="store-open">
+          <span class="track"></span>
+          <span id="store-open-label">Loja fechada</span>
+        </label>
+        <button class="btn btn-sm sound-btn" id="sound-btn" type="button" hidden>🔔 Ativar som</button>
+        <a class="btn btn-ghost btn-sm top-link hide-sm" href="/" target="_blank" rel="noopener">Ver site ↗</a>
+        <button class="btn btn-ghost btn-sm top-link" id="logout" type="button">Sair</button>
+      </div>
+      <nav class="tabs" aria-label="Seções">
+        <a href="#pedidos" data-tab="pedidos">Pedidos <span class="tab-badge" id="new-count" hidden>0</span></a>
+        <a href="#cardapio" data-tab="cardapio">Cardápio</a>
+        <a href="#entrega" data-tab="entrega">Entrega</a>
+        <a href="#relatorios" data-tab="relatorios">Relatórios</a>
+        <a href="#config" data-tab="config">Configurações</a>
+      </nav>
+    </header>
+    <div class="conn-banner" id="conn-banner" hidden>Reconectando… novos pedidos podem demorar a aparecer.</div>
+    <main class="admin-main">
+      <section id="tab-pedidos" data-panel="pedidos" hidden></section>
+      <section id="tab-cardapio" data-panel="cardapio" hidden></section>
+      <section id="tab-entrega" data-panel="entrega" hidden></section>
+      <section id="tab-relatorios" data-panel="relatorios" hidden></section>
+      <section id="tab-config" data-panel="config" hidden></section>
+    </main>
+  </div>
+
+  <!-- Editor de produto -->
+  <dialog id="product-editor" class="sheet" aria-labelledby="pe-title">
+    <form class="dialog-body" id="product-editor-form" novalidate>
+      <div class="dialog-head">
+        <h2 id="pe-title">Produto</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Fechar">✕</button>
+      </div>
+      <div class="dialog-content form-grid">
+        <div class="image-field">
+          <div class="image-preview" id="pe-image-preview"></div>
+          <div class="image-actions">
+            <label class="btn btn-outline btn-sm">
+              Escolher foto
+              <input type="file" accept="image/*" id="pe-image-input" class="sr-only">
+            </label>
+            <button type="button" class="btn btn-ghost btn-sm" id="pe-image-remove">Remover foto</button>
+            <small class="muted">A foto é reduzida automaticamente.</small>
+          </div>
+        </div>
+        <label class="field"><span>Nome</span><input name="name" required maxlength="80"></label>
+        <label class="field"><span>Categoria</span><select name="category_id" required></select></label>
+        <label class="field"><span>Descrição</span><textarea name="description" maxlength="300" rows="2"></textarea></label>
+        <div class="form-row">
+          <label class="field"><span>Preço de venda (R$)</span><input name="price" inputmode="decimal" required placeholder="0,00"></label>
+          <label class="field"><span>Custo (R$)</span><input name="cost" inputmode="decimal" placeholder="0,00"><small>Ingredientes + embalagem</small></label>
+        </div>
+        <p class="margin-preview" id="pe-margin"></p>
+        <div class="form-row">
+          <label class="switch"><input type="checkbox" name="available"><span class="track"></span>Disponível</label>
+          <label class="switch"><input type="checkbox" name="track_stock"><span class="track"></span>Controlar estoque</label>
+        </div>
+        <label class="field" id="pe-stock-field"><span>Quantidade em estoque</span><input name="stock" type="number" min="0" max="100000" inputmode="numeric"><small>Quando zerar, o item aparece como esgotado.</small></label>
+        <p class="alert" id="pe-error" role="alert" hidden></p>
+      </div>
+      <div class="dialog-foot editor-foot">
+        <button type="button" class="btn btn-danger btn-sm" id="pe-delete">Excluir</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Área de impressão da comanda -->
+  <div id="print-area" aria-hidden="true"></div>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Max Lanches — Churrasquinho, hambúrguer e cachorro-quente</title>
+  <meta name="description" content="Peça online no Max Lanches: churrasquinhos na brasa, hambúrgueres e cachorros-quentes. Entrega ou retirada no food truck.">
+  <meta name="theme-color" content="#C8281E">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Max Lanches — Peça online">
+  <meta property="og:description" content="Churrasquinho, hambúrguer e cachorro-quente feitos na hora. Entrega ou retirada.">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preload" href="/fonts/nunito-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/bebas-neue-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/site.css">
+  <script type="module" src="/js/site/main.js"></script>
+</head>
+<body>
+  <a class="sr-only" href="#cardapio">Pular para o cardápio</a>
+
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="logo" href="/" aria-label="Max Lanches — início">
+        <span class="logo-mark" aria-hidden="true">M</span>
+        <span class="logo-text"><strong data-store-name>Max Lanches</strong><small>food truck</small></span>
+      </a>
+      <span class="status-pill" id="status-pill" hidden></span>
+      <button class="cart-btn" id="cart-open-top" type="button" aria-label="Abrir carrinho">
+        <span aria-hidden="true">🛒</span>
+        <span class="cart-count" id="cart-count-top" hidden>0</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container hero-inner">
+      <p class="hero-kicker">Feito na hora, na brasa e na chapa</p>
+      <h1 class="hero-title"><span data-store-name>Max Lanches</span></h1>
+      <p class="hero-tagline" id="tagline"></p>
+      <ul class="hero-info" id="hero-info"></ul>
+      <div class="hero-cta">
+        <a class="btn btn-accent" href="#cardapio">Ver cardápio</a>
+        <a class="btn btn-whatsapp" id="hero-whatsapp" hidden target="_blank" rel="noopener">Chamar no WhatsApp</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="container">
+    <div class="track-banner" id="track-banner" hidden></div>
+    <div class="closed-banner" id="closed-banner" hidden>
+      <strong>Estamos fechados agora.</strong>
+      <span>Dá uma olhada no cardápio e volte no nosso horário: <span id="closed-hours"></span></span>
+    </div>
+  </div>
+
+  <nav class="cat-nav" aria-label="Categorias">
+    <div class="container cat-nav-inner" id="cat-nav"></div>
+  </nav>
+
+  <main class="container menu" id="cardapio" tabindex="-1">
+    <div class="menu-loading" id="menu-loading">Carregando cardápio…</div>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner" id="footer"></div>
+  </footer>
+
+  <button class="cart-bar" id="cart-bar" type="button" hidden>
+    <span class="cart-bar-count" id="cart-bar-count">0</span>
+    <span>Ver carrinho</span>
+    <strong id="cart-bar-total">R$ 0,00</strong>
+  </button>
+
+  <!-- Detalhe do produto -->
+  <dialog id="product-dialog" class="sheet" aria-labelledby="pd-title">
+    <form class="dialog-body" method="dialog" id="product-form">
+      <div class="pd-media" id="pd-media"></div>
+      <div class="dialog-content">
+        <h2 id="pd-title" class="pd-title"></h2>
+        <p class="pd-desc muted" id="pd-desc"></p>
+        <p class="pd-price" id="pd-price"></p>
+        <label class="field pd-notes">
+          <span>Alguma observação?</span>
+          <textarea id="pd-notes" maxlength="140" rows="2" placeholder="Ex.: sem cebola, bem passado, sabor Guaraná…"></textarea>
+        </label>
+      </div>
+      <div class="dialog-foot pd-foot">
+        <div class="qty" role="group" aria-label="Quantidade">
+          <button type="button" class="qty-btn" data-qty="-1" aria-label="Diminuir">−</button>
+          <output id="pd-qty" aria-live="polite">1</output>
+          <button type="button" class="qty-btn" data-qty="1" aria-label="Aumentar">+</button>
+        </div>
+        <button type="submit" class="btn btn-primary pd-add" id="pd-add">Adicionar</button>
+      </div>
+      <button type="button" class="icon-btn pd-close" data-close aria-label="Fechar">✕</button>
+    </form>
+  </dialog>
+
+  <!-- Carrinho e finalização -->
+  <dialog id="cart-dialog" class="sheet cart-dialog" aria-labelledby="cart-title">
+    <div class="dialog-body">
+      <div class="dialog-head">
+        <button type="button" class="icon-btn" id="checkout-back" aria-label="Voltar ao carrinho" hidden>←</button>
+        <h2 id="cart-title">Seu pedido</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Fechar">✕</button>
+      </div>
+
+      <div class="dialog-content" id="cart-step">
+        <div id="cart-items"></div>
+      </div>
+
+      <form class="dialog-content form-grid" id="checkout-form" hidden novalidate>
+        <div class="form-row">
+          <label class="field">
+            <span>Seu nome</span>
+            <input name="customer_name" autocomplete="name" required maxlength="60">
+          </label>
+          <label class="field">
+            <span>WhatsApp</span>
+            <input name="customer_phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="(00) 00000-0000">
+          </label>
+        </div>
+
+        <fieldset class="field fieldset">
+          <legend class="field-label">Como você quer receber?</legend>
+          <div class="choices" id="fulfillment-choices">
+            <label class="choice"><input type="radio" name="fulfillment" value="entrega"><span>🛵 Entrega</span></label>
+            <label class="choice"><input type="radio" name="fulfillment" value="retirada"><span>🏃 Retirar no food truck</span></label>
+          </div>
+        </fieldset>
+
+        <div class="form-grid" id="delivery-fields" hidden>
+          <label class="field">
+            <span>Bairro</span>
+            <select name="zone_id" required></select>
+            <small>Não achou seu bairro? Chame a gente no WhatsApp.</small>
+          </label>
+          <label class="field">
+            <span>Endereço (rua e número)</span>
+            <input name="address" autocomplete="street-address" maxlength="200" required>
+          </label>
+          <label class="field">
+            <span>Complemento / ponto de referência</span>
+            <input name="address_reference" maxlength="120" placeholder="Apto, bloco, casa azul…">
+          </label>
+        </div>
+        <p class="pickup-info muted" id="pickup-info" hidden></p>
+
+        <fieldset class="field fieldset">
+          <legend class="field-label">Pagamento</legend>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="payment_method" value="pix"><span>Pix</span></label>
+            <label class="choice"><input type="radio" name="payment_method" value="dinheiro"><span>Dinheiro</span></label>
+            <label class="choice"><input type="radio" name="payment_method" value="cartao"><span>Cartão<small>na maquininha</small></span></label>
+          </div>
+        </fieldset>
+        <label class="field" id="change-field" hidden>
+          <span>Troco para quanto?</span>
+          <input name="change_for" inputmode="decimal" placeholder="Deixe vazio se não precisar">
+        </label>
+
+        <label class="field">
+          <span>Observações do pedido</span>
+          <textarea name="notes" maxlength="300" rows="2" placeholder="Algo que devemos saber?"></textarea>
+        </label>
+
+        <div class="alert" id="checkout-error" role="alert" hidden></div>
+      </form>
+
+      <div class="dialog-foot cart-foot" id="cart-foot">
+        <dl class="totals" id="cart-totals"></dl>
+        <button type="button" class="btn btn-primary btn-block" id="cart-next">Continuar</button>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

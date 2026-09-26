@@ -1,0 +1,3 @@
+Bebas Neue (Dharma Type) e Nunito (Vernon Adams, Cyreal, Jacques Le Bailly) são distribuídas
+sob a SIL Open Font License 1.1 — https://openfontlicense.org
+Arquivos obtidos do Google Fonts (subconjunto latino, suficiente para português).

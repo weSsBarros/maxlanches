@@ -1,0 +1,31 @@
+# Sobe o app + Caddy (HTTPS automático com Let's Encrypt).
+# 1. Aponte o domínio (ex.: maxlanches.com.br) para o IP do servidor.
+# 2. Ajuste o domínio no Caddyfile e crie o .env a partir do .env.example.
+# 3. docker compose up -d
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TRUST_PROXY: 1
+    volumes:
+      - app_data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - app
+
+volumes:
+  # Banco, fotos e backups. Backup: docker compose exec app npm run backup
+  app_data:
+  caddy_data:

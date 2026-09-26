@@ -1,0 +1,27 @@
+{
+  "name": "maxlanches",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site, cardápio online, pedidos e painel de gestão do food truck Max Lanches",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "dev": "node --env-file-if-exists=.env --watch src/server.js",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "demo": "node --env-file-if-exists=.env scripts/demo-orders.js",
+    "backup": "node --env-file-if-exists=.env scripts/backup.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weSsBarros/maxlanches.git"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "express": "^5.2.1",
+    "multer": "^2.4.0"
+  }
+}
