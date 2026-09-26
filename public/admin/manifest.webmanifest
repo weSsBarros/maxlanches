@@ -1,0 +1,10 @@
+{
+  "name": "Painel Max Lanches",
+  "short_name": "Painel Max",
+  "start_url": "/admin/",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#1F1A17",
+  "theme_color": "#1F1A17",
+  "icons": [{ "src": "/img/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

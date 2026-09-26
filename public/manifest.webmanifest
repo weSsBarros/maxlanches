@@ -1,0 +1,9 @@
+{
+  "name": "Max Lanches",
+  "short_name": "Max Lanches",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF8EE",
+  "theme_color": "#C8281E",
+  "icons": [{ "src": "/img/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
